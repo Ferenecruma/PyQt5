@@ -12,10 +12,8 @@ def create_hint(string):
         """
         Standart hint for user 
         """
-        hint = QPlainTextEdit()
-        hint.setPlainText(string)
+        hint = QLabel(string)
         hint.setMaximumHeight(26)
-        hint.setReadOnly(True)
         hint.setFrameStyle(0)
         return hint
 
@@ -25,6 +23,8 @@ class ResultWindow(QWidget):
     """
     def __init__(self, result=None, message=""):
         super().__init__()
+
+        self.setWindowTitle("Результати")
 
         self.main_layout = QVBoxLayout()
         hint = create_hint(message)
@@ -45,6 +45,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("My App")
+        self.is_added = False
 
         self.main_layout = QVBoxLayout()
         first_input = QHBoxLayout()
@@ -79,8 +80,11 @@ class MainWindow(QMainWindow):
         matrix and vector of right dimension
         to the main layout.
         """
+        if self.is_added:
+            self.delete_from_main_layout()
+        else:
+            self.is_added = True
 
-        self.button_pass_args.setDisabled(True)
         self.m, self.n = int(self.m_input.cleanText()), int(self.n_input.cleanText())
 
         self.matrix, self.matrix_layout = self.create_matrix_input(self.m, self.n)
@@ -91,6 +95,7 @@ class MainWindow(QMainWindow):
         self.button_compute.setText("Знайти розвязок")
         self.button_compute.clicked.connect(self.compute_result)
 
+        self.main_layout.addWidget(create_hint('Введіть матрицю A:'))
         self.main_layout.addWidget(self.matrix)
         self.main_layout.addWidget(hint)
         self.main_layout.addWidget(self.vector_b)
@@ -134,10 +139,17 @@ class MainWindow(QMainWindow):
 
         self.display_result(res, message)
         
-    
     def display_result(self, result, message):
         self.result_w = ResultWindow(result=result, message=message)
         self.result_w.show()
+    
+    def delete_from_main_layout(self):
+        items = []
+        for i in range(2, self.main_layout.count()):
+            items.append(self.main_layout.itemAt(i).widget())
+        for widget in items:
+            widget.hide()
+            self.main_layout.removeWidget(widget)
 
 
 app = QApplication(sys.argv)
