@@ -5,7 +5,6 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QApplication, QGridLayout, QLabel, QMainWindow, 
 QWidget, QDoubleSpinBox, QVBoxLayout, QLineEdit, QHBoxLayout, QPushButton,
 QPlainTextEdit, QSpinBox)
-from layout_colorwidget import Color
 
 
 def create_hint(string):
@@ -21,7 +20,7 @@ class ResultWindow(QWidget):
     """
     Window for results of a computations displaying
     """
-    def __init__(self, result=None, message=""):
+    def __init__(self, result=None, message="", add_v=False):
         super().__init__()
 
         self.setWindowTitle("Результати")
@@ -29,16 +28,47 @@ class ResultWindow(QWidget):
         self.main_layout = QVBoxLayout()
         hint = create_hint(message)
         self.main_layout.addWidget(hint)
+        
+        if result is not None:
+            self.layout = QGridLayout()
 
-        layout = QGridLayout()
-        for i in range(len(result)):
-            layout.addWidget(QLabel(str(result[i])), i, 0)
+            if callable(result):
+                self.compute_res = result
+                result = result()
+                self.m = len(result)
+            
+            for i in range(len(result)):
+                self.layout.addWidget(QLabel(str(result[i])), i, 0)
+                if callable(self.compute_res):
+                    spin_box = QDoubleSpinBox()
+                    spin_box.setMinimum(-99.99)
+                    self.layout.addWidget(spin_box, i, 2)
 
-        matrix_display = QWidget()
-        matrix_display.setLayout(layout)
-        self.main_layout.addWidget(matrix_display)
+            matrix_display = QWidget()
+            matrix_display.setLayout(self.layout)
+            self.main_layout.addWidget(matrix_display)
+
+            if callable(self.compute_res):
+                button_compute = QPushButton()
+                button_compute.setText("Ввести вектор v")
+                button_compute.clicked.connect(self.compute_with_v)
+                self.main_layout.addWidget(button_compute)
 
         self.setLayout(self.main_layout)
+    
+    def compute_with_v(self):
+        data = np.zeros((self.m,1))
+        for i in range(self.m):
+            item = self.layout.itemAtPosition(i, 2).widget()
+            data[i, 0] = float(item.cleanText().replace(',','.'))
+        
+        res = self.compute_res(data)
+        for i in range(self.m):
+            item = self.layout.itemAtPosition(i, 0).widget()
+            item.setText(str(res[i][0]))
+
+    
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -132,10 +162,19 @@ class MainWindow(QMainWindow):
         vector_b = self.get_data_from_table(self.vector_layout, self.m, 1)
         try:
             res = np.linalg.solve(matrix, vector_b)
-            message = "Found exact solution!"
+            message = "Знайшовся точний розвязок!"
         except:
-            res = np.linalg.lstsq(matrix, vector_b, rcond=None)[0]
-            message = "Couldnt find exact solution.But have approximate."
+            try:
+                inv_A = np.linalg.pinv(matrix)
+
+                def param_funcion(v=np.zeros((self.n, 1))):
+                    return inv_A.dot(vector_b) + v - inv_A.dot(matrix.dot(v))
+                
+                res = param_funcion
+                message = "Не вдалося знайти точний розвязок.Знайшовся приблизний."
+            except:
+                res = None
+                message = "Не вдалося знайти жодного розвязку системи."
 
         self.display_result(res, message)
         
@@ -144,6 +183,10 @@ class MainWindow(QMainWindow):
         self.result_w.show()
     
     def delete_from_main_layout(self):
+        """
+        Clearing layout from widgets
+        after updating m and n
+        """
         items = []
         for i in range(2, self.main_layout.count()):
             items.append(self.main_layout.itemAt(i).widget())
